@@ -3,18 +3,25 @@ package reviews;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import preprocess.Analyzers;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class AmazonReviews {
     public static Analyzer KStemmer = Analyzers.analyzerKStem();
@@ -23,6 +30,11 @@ public class AmazonReviews {
 
 
     public static void main(String[] args) throws IOException {
+
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("Text");
+
+
         Analyzer STEMMER = KStemmer; // Change with specified stemmer
 
 
@@ -33,6 +45,7 @@ public class AmazonReviews {
         PrintWriter xmlFile = new PrintWriter("ReviewsCarrot2.xml","UTF-8");
         xmlFile.println("<searchresult>");
 
+        int excelRow=0;
         for(Map.Entry<String,Integer> e: linkPageCount.entrySet()) {
             String baseUrl=e.getKey();
             for(int i=1; i<=e.getValue();i++) {
@@ -41,6 +54,7 @@ public class AmazonReviews {
                 Document doc = Jsoup.connect(url).get();
                 Element cmReviewList = doc.getElementById("cm_cr-review_list");
                 Elements reviews = cmReviewList.getElementsByAttributeValue("data-hook","review");
+
                 for (Element r : reviews) {
                     xmlFile.println("<document>");
 
@@ -57,11 +71,17 @@ public class AmazonReviews {
                     xmlFile.println("</snippet>");
 
                     xmlFile.println("</document>");
+
+                    sheet.createRow(excelRow++).createCell(0).setCellValue(title+" "+body);
                 }
             }
         }
         xmlFile.println("</searchresult>");
         xmlFile.close();
+
+        FileOutputStream out = new FileOutputStream(new File("Reviews.xlsx"));
+        workbook.write(out);
+        out.close();
     }
 
 
@@ -75,4 +95,6 @@ public class AmazonReviews {
                 .trim(); // Remove white space from beginning and ending
         return preprocessed;
     }
+
+
 }
