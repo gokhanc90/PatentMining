@@ -33,6 +33,7 @@ public class AmazonReviews {
 
         XSSFWorkbook workbook = new XSSFWorkbook();
         XSSFSheet sheet = workbook.createSheet("Text");
+        XSSFSheet sheet2 = workbook.createSheet("Raw");
 
 
         Analyzer STEMMER = KStemmer; // Change with specified stemmer
@@ -60,19 +61,22 @@ public class AmazonReviews {
 
                     String title = r.getElementsByAttributeValue("data-hook","review-title").get(0).text();
                     xmlFile.println("<title>");
-                    title = preprocess(title,STEMMER);
-                    xmlFile.println(title);
+                    String ptitle = preprocess(title,STEMMER);
+                    xmlFile.println(ptitle);
                     xmlFile.println("</title>");
 
                     String body = r.getElementsByAttributeValue("data-hook","review-body").get(0).text();
                     xmlFile.println("<snippet>");
-                    body = preprocess(body,STEMMER);
-                    xmlFile.println(body);
+                    String pbody = preprocess(body,STEMMER);
+                    xmlFile.println(pbody);
                     xmlFile.println("</snippet>");
 
                     xmlFile.println("</document>");
 
-                    sheet.createRow(excelRow++).createCell(0).setCellValue(title+" "+body);
+                    sheet.createRow(excelRow).createCell(0).setCellValue(ptitle+" "+pbody);
+                    sheet2.createRow(excelRow).createCell(0).setCellValue(title);
+                    sheet2.createRow(excelRow++).createCell(1).setCellValue(body);
+
                 }
             }
         }
