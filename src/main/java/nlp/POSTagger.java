@@ -11,10 +11,8 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class POSTagger {
     Properties props;
@@ -114,18 +112,47 @@ public class POSTagger {
         XSSFSheet sheet = workbook.getSheet("Raw");
         Iterator<Row> iterator = sheet.iterator();
 
+        HashMap<String,List<String>> tags = new HashMap<>();
+
         BufferedWriter writer = new BufferedWriter(new FileWriter("NLPReviews.txt"));
         int number = 1;
         while (iterator.hasNext()) {
             System.out.println(number);
             Row currentRow = iterator.next();
             String text = currentRow.getCell(1).getStringCellValue();
-            posTag(text,writer,number++);
+            posTag(text,writer,number++,tags);
         }
         writer.close();
+
+        System.out.println("***************************************************");
+        Map<String,Integer> freq = new HashMap<>();
+        for(Map.Entry<String,List<String>> entry : tags.entrySet()){
+            System.out.println(entry.getKey() + " : " + entry.getValue());
+
+            List<String> words = entry.getValue();
+
+            if(entry.getKey().startsWith("NN")){
+                for(String word : words){
+                    freq.put(word,freq.getOrDefault(word,0)+1);
+                }
+            }
+        }
+
+        Map<String,Integer> sortedByFreq =
+                freq.entrySet().stream()
+                        .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                        .limit(20)
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+        for(Map.Entry<String,Integer> entry : sortedByFreq.entrySet()){
+            System.out.println(entry.getKey() + " - " + entry.getValue());
+        }
+
+        
     }
 
-    private void posTag(String text,BufferedWriter writer,int reviewNumber) throws IOException {
+    private void posTag(String text,BufferedWriter writer,int reviewNumber, HashMap<String,List<String>> tags) throws IOException {
         // create a document object
         writer.write("R"+reviewNumber+":\t"+text);
         writer.newLine();
@@ -145,6 +172,17 @@ public class POSTagger {
             writer.write("\tNerTag:\t"+nerTags);
             writer.newLine();
             sentenceNumber++;
+
+            for(int i=0;i<posTags.size(); i++){
+                String postag = posTags.get(i);
+                String word = sentence.tokens().get(i).word();
+                if(tags.get(postag)==null){
+                    tags.put(postag,new ArrayList<String>());
+                }
+                List<String> tagWords = tags.get(postag);
+                tagWords.add(word);
+                tags.put(postag,tagWords);
+            }
         }
     }
 
