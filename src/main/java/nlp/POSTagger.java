@@ -2,12 +2,18 @@ package nlp;
 
 import edu.stanford.nlp.coref.data.CorefChain;
 import edu.stanford.nlp.ie.util.RelationTriple;
-import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.ling.IndexedWord;
+import edu.stanford.nlp.ling.*;
+import edu.stanford.nlp.parser.nndep.DependencyParser;
 import edu.stanford.nlp.pipeline.*;
+import edu.stanford.nlp.process.DocumentPreprocessor;
 import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
+import edu.stanford.nlp.tagger.maxent.MaxentTagger;
+import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.trees.TypedDependency;
+import edu.stanford.nlp.util.CoreMap;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -111,7 +117,7 @@ public class POSTagger {
 
     public void process2() throws IOException {
         XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
-        XSSFSheet sheet = workbook.getSheet("Raw");
+        XSSFSheet sheet = workbook.getSheet("Text");
         Iterator<Row> iterator = sheet.iterator();
 
         HashMap<String,List<String>> tags = new HashMap<>();
@@ -228,12 +234,15 @@ public class POSTagger {
 
 
         Map<String,List<String>> nouns = new LinkedHashMap<>();
+        List<String> verbs = new ArrayList<>();
         for(CoreSentence sentence : document.sentences()) {
             List<String> posTags = sentence.posTags();
             for(int i=0;i<posTags.size(); i++){
                 String postag = posTags.get(i);
-                if(!postag.startsWith("NN")) continue;
-                nouns.put(sentence.tokens().get(i).word(),new ArrayList<>());
+                if(postag.startsWith("NN"))
+                    nouns.put(sentence.tokens().get(i).word(),new ArrayList<>());
+                if(postag.startsWith("VB"))
+                    verbs.add(sentence.tokens().get(i).word());
 
             }
         }
@@ -262,15 +271,29 @@ public class POSTagger {
             System.out.println(dependencyParse);
             System.out.println();
 
-
             for(IndexedWord word : dependencyParse.vertexListSorted()){
                 for(SemanticGraphEdge edge : dependencyParse.getOutEdgesSorted(word)){
-                    System.out.println(edge.getTarget().word().split("/")[1]);
+                    if(nouns.containsKey(edge.getSource().word())){
+                        if(edge.getRelation().toString().equals("amod") || edge.getRelation().toString().equals("advmod")){
+                            List<String> nounPhrases = nouns.get(edge.getSource().word());
+                            nounPhrases.add(edge.getTarget().toString());
+                            nouns.put(edge.getSource().word(),nounPhrases);
+                        }
+                    }
 
+                    if(verbs.contains(edge.getSource().word()) && nouns.containsKey(edge.getTarget().word())){
+                        if(edge.getRelation().toString().contains("nsubj")){
+                            List<String> nounPhrases = nouns.get(edge.getTarget().word());
+                            nounPhrases.add(edge.getSource().toString());
+                            nouns.put(edge.getTarget().word(),nounPhrases);
+                        }
+                    }
                 }
             }
             
         }
+
+        System.out.println("");
 
 //        // kbp relations found in fifth sentence
 //        List<RelationTriple> relations =
