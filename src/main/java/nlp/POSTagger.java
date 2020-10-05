@@ -1,18 +1,12 @@
 package nlp;
 
 import edu.stanford.nlp.coref.data.CorefChain;
-import edu.stanford.nlp.ie.util.RelationTriple;
 import edu.stanford.nlp.ling.*;
-import edu.stanford.nlp.parser.nndep.DependencyParser;
 import edu.stanford.nlp.pipeline.*;
-import edu.stanford.nlp.process.DocumentPreprocessor;
 import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
-import edu.stanford.nlp.tagger.maxent.MaxentTagger;
-import edu.stanford.nlp.trees.GrammaticalStructure;
 import edu.stanford.nlp.trees.Tree;
-import edu.stanford.nlp.trees.TypedDependency;
+import edu.stanford.nlp.trees.TreeCoreAnnotations;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.util.StringUtils;
 import org.apache.poi.ss.usermodel.Row;
@@ -121,13 +115,14 @@ public class POSTagger {
 
 
     public void process2() throws IOException {
-        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
+        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews_short_short.xlsx")));
         XSSFSheet sheet = workbook.getSheet("Raw");
         Iterator<Row> iterator = sheet.iterator();
 
         HashMap<String,List<String>> tags = new HashMap<>();
-        Map<String,Set<String>> nouns = new LinkedHashMap<>();
+        Map<String,Map<String,Integer>> nouns = new LinkedHashMap<>();
         List<String> verbs = new ArrayList<>();
+        List<String> nounphrasess = new ArrayList<>();
         List<String> stops = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader("stopwords.txt"))) {
             String line;
@@ -152,12 +147,12 @@ public class POSTagger {
                 for (int i = 0; i < posTags.size(); i++) {
                     String postag = posTags.get(i);
                     if (postag.startsWith("NN") && (!stops.contains(sentence.tokens().get(i).word()) || !stops.contains(sentence.tokens().get(i).lemma())))
-                        nouns.put(sentence.tokens().get(i).lemma(), new HashSet<>());
+                        nouns.put(sentence.tokens().get(i).lemma(), new LinkedHashMap<>());
                     if (postag.startsWith("VB") && (!stops.contains(sentence.tokens().get(i).word()) || !stops.contains(sentence.tokens().get(i).lemma())))
-                        verbs.add(sentence.tokens().get(i).word());
-
+                        verbs.add(sentence.tokens().get(i).lemma());
                 }
             }
+
 
             System.out.println(count++);
         }
@@ -182,19 +177,26 @@ public class POSTagger {
             for(CoreSentence sentence : document.sentences()) {
                 SemanticGraph dependencyParse = sentence.dependencyParse();
                 for(IndexedWord word : dependencyParse.vertexListSorted()){
+                    if(!(word.tag().startsWith("NN") || word.tag().startsWith("VB"))) continue;
                     for(SemanticGraphEdge edge : dependencyParse.getOutEdgesSorted(word)){
                         if(nouns.containsKey(edge.getSource().lemma())){
-                            if(edge.getRelation().toString().equals("amod") || edge.getRelation().toString().equals("advmod")){
-                                Set<String> nounPhrases = nouns.get(edge.getSource().lemma());
-                                nounPhrases.add(edge.getTarget().toString());
+                            if(edge.getRelation().toString().equals("amod") || edge.getRelation().toString().equals("advmod") || edge.getRelation().toString().equals("compound")){
+                                Map<String,Integer> nounPhrases = nouns.get(edge.getSource().lemma());
+                                if(nounPhrases.get(edge.getTarget().lemma()) == null)
+                                    nounPhrases.put(edge.getTarget().lemma()+"/ADJ",1);
+                                else
+                                    nounPhrases.put(edge.getTarget().lemma()+"/ADJ",nounPhrases.get(edge.getTarget().lemma())+1);
                                 nouns.put(edge.getSource().lemma(),nounPhrases);
                             }
                         }
 
-                        if(verbs.contains(edge.getSource().word()) && nouns.containsKey(edge.getTarget().lemma())){
-                            if(edge.getRelation().toString().contains("nsubj")){
-                                Set<String> nounPhrases = nouns.get(edge.getTarget().lemma());
-                                nounPhrases.add(edge.getSource().toString());
+                        if(verbs.contains(edge.getSource().lemma()) && nouns.containsKey(edge.getTarget().lemma())){
+                            if(edge.getRelation().toString().contains("nsubj") || edge.getRelation().toString().contains("obj")){
+                                Map<String,Integer> nounPhrases = nouns.get(edge.getTarget().lemma());
+                                if(nounPhrases.get(edge.getSource().lemma()) == null)
+                                    nounPhrases.put(edge.getSource().lemma()+"/VB",1);
+                                else
+                                    nounPhrases.put(edge.getSource().lemma()+"/VB",nounPhrases.get(edge.getSource().lemma())+1);
                                 nouns.put(edge.getTarget().lemma(),nounPhrases);
                             }
                         }
@@ -222,26 +224,56 @@ public class POSTagger {
                         .collect(Collectors.toMap(
                                 Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
 
-        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("outRaw.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+//        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("outRaw.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
+//            for (Map.Entry<String, Integer> entry : sortedByFreq.entrySet()) {
+//
+//                System.out.println("*******************************************************************");
+//                System.out.println(entry.getKey() + " - " + entry.getValue());
+//                bw.write("*******************************************************************");
+//                bw.write(entry.getKey() + " - " + entry.getValue());
+//                bw.newLine();
+//
+//                Map<String,Integer> nounRef = nouns.get(entry.getKey());
+//
+//                if(nounRef==null) continue;
+//
+//                Map<String,Integer> sorted =
+//                        nounRef.entrySet().stream()
+//                                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+//                                .collect(Collectors.toMap(
+//                                        Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));;
+//
+//
+//
+//                for(Map.Entry<String,Integer> enttry : sorted.entrySet()){
+//                    System.out.println(enttry.getKey() + " - " + enttry.getValue());
+//                    bw.write(enttry.getKey() + " - " + enttry.getValue());
+//                    bw.newLine();
+//                }
+//            }
+//        }
 
-            for (Map.Entry<String, Integer> entry : sortedByFreq.entrySet()) {
-                if (!nouns.containsKey(entry.getKey())) continue;
-                System.out.println("**********************************************************************");
-                System.out.println(entry.getKey() + " - " + entry.getValue());
-                Set<String> nounRef = nouns.get(entry.getKey());
-//                nounRef.forEach(System.out::println);
 
-                bw.write("**********************************************************************");
-                bw.newLine();
-                bw.write(entry.getKey() + " - " + entry.getValue());
-                bw.newLine();
-
-                for(String nnn : nounRef){
-                    bw.write(nnn);
-                    bw.newLine();
-                }
-            }
-        }
+//        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("outRaw.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+//
+//            for (Map.Entry<String, Integer> entry : sortedByFreq.entrySet()) {
+//                if (!nouns.containsKey(entry.getKey())) continue;
+//                System.out.println("**********************************************************************");
+//                System.out.println(entry.getKey() + " - " + entry.getValue());
+//                Set<String> nounRef = nouns.get(entry.getKey());
+////                nounRef.forEach(System.out::println);
+//
+//                bw.write("**********************************************************************");
+//                bw.newLine();
+//                bw.write(entry.getKey() + " - " + entry.getValue());
+//                bw.newLine();
+//
+//                for(String nnn : nounRef){
+//                    bw.write(nnn);
+//                    bw.newLine();
+//                }
+//            }
+//        }
 
 
     }
@@ -278,8 +310,257 @@ public class POSTagger {
         }
     }
 
+    private void deneme() throws IOException {
+        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews_short.xlsx")));
+        XSSFSheet sheet = workbook.getSheet("Raw");
+        Iterator<Row> iterator = sheet.iterator();
+
+        List<Noun> nouns = new ArrayList<>();
+        List<String> verbs = new ArrayList<>();
+        List<String> stops = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader("stopwords.txt"))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                stops.add(line);
+            }
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
+        int count = 0;
+        int revNum=1;
+        while (iterator.hasNext()) {
+            Row currentRow = iterator.next();
+            String text = currentRow.getCell(0).getStringCellValue();
+            if(StringUtils.isNullOrEmpty(text)) continue;
+            text = text.replaceAll("[^a-zA-Z0-9.' ]", "").toLowerCase();
+            text = text.replaceAll("ı", "i").toLowerCase();
+            CoreDocument document = new CoreDocument(text);
+            pipeline.annotate(document);
+            int sentenceNum=1;
+            for (CoreSentence sentence : document.sentences()) {
+                List<String> posTags = sentence.posTags();
+                for (int i = 0; i < posTags.size(); i++) {
+                    String postag = posTags.get(i);
+                    if (postag.startsWith("NN") && (!stops.contains(sentence.tokens().get(i).word()) || !stops.contains(sentence.tokens().get(i).lemma()))){
+                        String nounWord = sentence.tokens().get(i).lemma();
+                        Noun noun = nouns.stream().filter(nnn -> nounWord.equals(nnn.getNounText())).findFirst().orElse(null);
+                        if(noun==null){
+                            ArrayList<String> revSent = new ArrayList<>();
+                            revSent.add(revNum + "," + sentenceNum);
+                            noun = new Noun();
+                            noun.setNounText(nounWord);
+                            noun.setFreq(1);
+                            noun.setReviewSentenceIndex(revSent);
+                            noun.setAdjectives(new LinkedHashMap<String,Integer>());
+                            noun.setVerbs(new LinkedHashMap<String,Integer>());
+                            noun.setCompounds(new LinkedHashMap<String,Integer>());
+                        }else{
+                            nouns.remove(noun);
+                            List<String> revSent = noun.getReviewSentenceIndex();
+                            revSent.add(revNum + "," + sentenceNum);
+                            noun.setFreq(noun.getFreq()+1);
+                            noun.setReviewSentenceIndex(revSent);
+                        }
+                        nouns.add(noun);
+                    }
+                    if (postag.startsWith("VB") && (!stops.contains(sentence.tokens().get(i).word()) || !stops.contains(sentence.tokens().get(i).lemma())))
+                        verbs.add(sentence.tokens().get(i).lemma());
+                }
+                sentenceNum++;
+            }
+
+            revNum++;
+            System.out.println(count++);
+        }
+
+        iterator = sheet.iterator();
+        while (iterator.hasNext()) {
+            Row currentRow = iterator.next();
+            String text = currentRow.getCell(0).getStringCellValue();
+            if(StringUtils.isNullOrEmpty(text)) continue;
+            text = text.replaceAll("[^a-zA-Z0-9/.' ]", "").toLowerCase();
+            text = text.replaceAll("ı", "i").toLowerCase();
+
+            CoreDocument document = new CoreDocument(text);
+            pipeline.annotate(document);
+
+            for(CoreSentence sentence : document.sentences()) {
+                SemanticGraph dependencyParse = sentence.dependencyParse();
+                for(IndexedWord word : dependencyParse.vertexListSorted()){
+                    if(word.tag().startsWith("NN")){
+                        Noun noun = nouns.stream().filter(nnn -> word.lemma().equals(nnn.getNounText())).findFirst().orElse(null);
+                        if(noun==null) continue;
+                        for (SemanticGraphEdge edge : dependencyParse.getOutEdgesSorted(word)) {
+                            if (edge.getRelation().toString().equals("compound")) {
+                                Map<String,Integer> compounds = noun.getCompounds();
+                                compounds.put(edge.getTarget().lemma() + " " + edge.getSource().lemma(),compounds.getOrDefault(edge.getTarget().lemma() + " " + edge.getSource().lemma(), 0)+1);
+                                noun.setCompounds(compounds);
+                            }
+                            if(edge.getRelation().toString().equals("amod") || edge.getRelation().toString().equals("advmod")){
+                                Map<String,Integer> adjectives = noun.getAdjectives();
+                                adjectives.put(edge.getTarget().lemma(),adjectives.getOrDefault(edge.getTarget().lemma(), 0)+1);
+                                noun.setAdjectives(adjectives);
+                            }
+
+                            if(edge.getRelation().toString().equals("nn") || edge.getRelation().toString().equals("npadvmod")
+                                    || edge.getRelation().toString().equals("nsubj")){
+                                Map<String,Integer> adjectives = noun.getAdjectives();
+                                adjectives.put(edge.getTarget().lemma(),adjectives.getOrDefault(edge.getTarget().lemma(), 0)+1);
+                                noun.setAdjectives(adjectives);
+                            }
+                        }
+
+                        for (SemanticGraphEdge edge : dependencyParse.getIncomingEdgesSorted(word)) {
+                            if(edge.getRelation().toString().equals("nsubj") || edge.getRelation().toString().contains("obj")){
+                                if(!verbs.contains(edge.getSource().lemma())) continue;
+                                String verb = edge.getSource().lemma();
+                                for (SemanticGraphEdge edge2 : dependencyParse.getOutEdgesSorted(edge.getSource())) {
+                                    if(edge2.getRelation().toString().equals("dep") || edge2.getRelation().toString().contains("comp")
+                                            || edge2.getRelation().toString().equals("dobj") || edge2.getRelation().toString().equals("advmod")
+                                            || edge2.getRelation().toString().equals("prt")|| edge2.getRelation().toString().equals("tmod")
+                                            || edge2.getRelation().toString().equals("vmod")){
+                                        verb += " " + edge2.getTarget().lemma();
+                                    }
+                                }
+
+                                for (SemanticGraphEdge edge3 : dependencyParse.getIncomingEdgesSorted(edge.getSource())) {
+                                    if(edge3.getRelation().toString().equals("dep") || edge3.getRelation().toString().equals("acomp")
+                                            || edge3.getRelation().toString().equals("dobj") || edge3.getRelation().toString().equals("advmod")
+                                            || edge3.getRelation().toString().equals("prt")|| edge3.getRelation().toString().equals("tmod")
+                                            || edge3.getRelation().toString().equals("vmod") || edge3.getRelation().toString().equals("xcomp")){
+                                        verb += " " + edge3.getSource().lemma();
+                                    }
+                                }
+                                Map<String,Integer> nounVerbs = noun.getVerbs();
+                                nounVerbs.put(verb,nounVerbs.getOrDefault(verb, 0)+1);
+                                noun.setVerbs(nounVerbs);
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+
+        Collections.sort(nouns, Comparator.comparing(Noun::getFreq).reversed());
+
+        for(Noun noun : nouns){
+            noun.setCompounds(noun.getCompounds().entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)));
+            noun.setAdjectives(noun.getAdjectives().entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)));
+            noun.setVerbs(noun.getVerbs().entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)));
+        }
+
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("outRaw.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
+
+            for(Noun noun : nouns){
+                Map<String,Integer> compounds = noun.getCompounds();
+                Map<String,Integer> adjectives = noun.getAdjectives();
+                Map<String,Integer> nounVerbs = noun.getVerbs();
+
+                bw.write("********************* " + noun.getNounText() + " ("+ noun.getFreq() + ")" +" **********************************");
+                bw.newLine();
+                bw.write("*********** Compunds of " + noun.getNounText());
+                bw.newLine();
+                for(Map.Entry<String,Integer> entry : compounds.entrySet())
+                    bw.write(entry.getKey()+"("+entry.getValue()+") ");
+
+                bw.newLine();
+                bw.write("*********** Adjectives of " + noun.getNounText());
+                bw.newLine();
+                for(Map.Entry<String,Integer> entry : adjectives.entrySet())
+                    bw.write(entry.getKey()+"("+entry.getValue()+") ");
+
+                bw.newLine();
+                bw.write("*********** Verbs of " + noun.getNounText());
+                bw.newLine();
+                for(Map.Entry<String,Integer> entry : nounVerbs.entrySet())
+                    bw.write(entry.getKey()+"("+entry.getValue()+") ");
+                bw.newLine();
+            }
+        }
+    }
+
 
     public static void main(String[] args) throws IOException {
-        new POSTagger().process2();
+//        new POSTagger().process2();
+        new POSTagger().deneme();
+    }
+
+    private class Noun{
+
+        String nounText;
+        Map<String,Integer> compounds;
+        Map<String,Integer> adjectives;
+        Map<String,Integer> verbs;
+        List<String> reviewSentenceIndex;
+        int freq;
+
+        public Noun(){
+        }
+
+        public Noun(String nounText, Map<String,Integer> compounds, Map<String,Integer> adjectives, Map<String,Integer> verbs, List<String> reviewSentenceIndex, int freq) {
+            this.compounds = compounds;
+            this.adjectives = adjectives;
+            this.verbs = verbs;
+            this.reviewSentenceIndex = reviewSentenceIndex;
+            this.freq = freq;
+        }
+
+        public String getNounText() {
+            return nounText;
+        }
+
+        public void setNounText(String nounText) {
+            this.nounText = nounText;
+        }
+
+        public Map<String,Integer> getCompounds() {
+            return compounds;
+        }
+
+        public void setCompounds(Map<String,Integer> compounds) {
+            this.compounds = compounds;
+        }
+
+        public Map<String,Integer> getAdjectives() {
+            return adjectives;
+        }
+
+        public void setAdjectives(Map<String,Integer> adjectives) {
+            this.adjectives = adjectives;
+        }
+
+        public Map<String,Integer> getVerbs() {
+            return verbs;
+        }
+
+        public void setVerbs(Map<String,Integer> verbs) {
+            this.verbs = verbs;
+        }
+
+        public List<String> getReviewSentenceIndex() {
+            return reviewSentenceIndex;
+        }
+
+        public void setReviewSentenceIndex(List<String> reviewSentenceIndex) {
+            this.reviewSentenceIndex = reviewSentenceIndex;
+        }
+
+        public int getFreq() {
+            return freq;
+        }
+
+        public void setFreq(int freq) {
+            this.freq = freq;
+        }
     }
 }
