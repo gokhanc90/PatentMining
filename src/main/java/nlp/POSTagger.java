@@ -311,7 +311,7 @@ public class POSTagger {
     }
 
     private void deneme() throws IOException {
-        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews_short.xlsx")));
+        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
         XSSFSheet sheet = workbook.getSheet("Raw");
         Iterator<Row> iterator = sheet.iterator();
 
