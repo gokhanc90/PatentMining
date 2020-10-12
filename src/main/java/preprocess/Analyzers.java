@@ -6,7 +6,9 @@ import org.apache.lucene.analysis.custom.CustomAnalyzer;
 import org.apache.lucene.analysis.en.KStemFilter;
 import org.apache.lucene.analysis.en.KStemFilterFactory;
 import org.apache.lucene.analysis.snowball.SnowballPorterFilterFactory;
+import org.apache.lucene.analysis.synonym.SynonymGraphFilterFactory;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.analysis.tr.Zemberek3StemFilterFactory;
 
 import java.io.IOException;
@@ -14,7 +16,9 @@ import java.io.StringReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class Analyzers {
@@ -63,6 +67,19 @@ public class Analyzers {
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
                     .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+                    .build();
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
+
+    public static Analyzer analyzerDefaultWordNet() {
+        try {
+            return CustomAnalyzer.builder(Paths.get("./"))
+                    .withTokenizer("standard")
+                    .addTokenFilter("lowercase")
+                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+                    .addTokenFilter(SynonymGraphFilterFactory.class, "format", "wordnet", "expand", "true", "synonyms", "wn_s.pl")
                     .build();
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -125,5 +142,32 @@ public class Analyzers {
         }
     }
 
+    public static Map<Integer,List<String>> getAnalyzedTokensWithSynonym(String text, Analyzer analyzer) {
 
+        final Map<Integer,List<String>> list = new LinkedHashMap<>();
+        try (TokenStream ts = analyzer.tokenStream(FIELD, new StringReader(text))) {
+
+            final CharTermAttribute termAtt = ts.addAttribute(CharTermAttribute.class);
+            final OffsetAttribute offsetAttribute = ts.addAttribute(OffsetAttribute.class);
+
+            ts.reset(); // Resets this stream to the beginning. (Required)
+            while (ts.incrementToken()) {
+                int startOffset = offsetAttribute.startOffset();
+                if(list.containsKey(startOffset)){
+                    List<String> l = list.get(startOffset);
+                    l.add(termAtt.toString());
+                    list.put(startOffset,l);
+                }
+                else{
+                    ArrayList<String> l = new ArrayList<>();
+                    l.add(termAtt.toString());
+                    list.put(startOffset, l);
+                }
+            }
+            ts.end();   // Perform end-of-stream operations, e.g. set the final offset.
+        } catch (IOException ioe) {
+            throw new RuntimeException("happened during string analysis", ioe);
+        }
+        return list;
+    }
 }
