@@ -2,9 +2,11 @@ package nlp;
 
 import edu.stanford.nlp.coref.data.CorefChain;
 import edu.stanford.nlp.ling.*;
+import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations;
 import edu.stanford.nlp.pipeline.*;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphEdge;
+import edu.stanford.nlp.sentiment.SentimentCoreAnnotations;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations;
 import edu.stanford.nlp.util.CoreMap;
@@ -310,9 +312,11 @@ public class POSTagger {
         }
     }
 
-    private void deneme() throws IOException {
-        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
-        XSSFSheet sheet = workbook.getSheet("Raw");
+    private void deneme(String excel, String sheetName, String output) throws IOException {
+//        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
+//        XSSFSheet sheet = workbook.getSheet("Raw");
+        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File(excel)));
+        XSSFSheet sheet = workbook.getSheet(sheetName);
         Iterator<Row> iterator = sheet.iterator();
 
         List<Noun> nouns = new ArrayList<>();
@@ -370,11 +374,13 @@ public class POSTagger {
             }
 
             revNum++;
-            System.out.println(count++);
+            System.out.println(++count);
         }
 
+        count=0;
         iterator = sheet.iterator();
         while (iterator.hasNext()) {
+            System.out.println(++count);
             Row currentRow = iterator.next();
             String text = currentRow.getCell(0).getStringCellValue();
             if(StringUtils.isNullOrEmpty(text)) continue;
@@ -386,6 +392,14 @@ public class POSTagger {
 
             for(CoreSentence sentence : document.sentences()) {
                 SemanticGraph dependencyParse = sentence.dependencyParse();
+
+//                boolean sentPos = true;
+//                Tree tree = sentence.coreMap().get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
+//                if(tree!=null) {
+//                    int mainSentiment = RNNCoreAnnotations.getPredictedClass(tree);
+//                    if (mainSentiment == 0 || mainSentiment == 1) sentPos = false;
+//                }
+
                 for(IndexedWord word : dependencyParse.vertexListSorted()){
                     if(word.tag().startsWith("NN")){
                         Noun noun = nouns.stream().filter(nnn -> word.lemma().equals(nnn.getNounText())).findFirst().orElse(null);
@@ -397,6 +411,10 @@ public class POSTagger {
                                 noun.setCompounds(compounds);
                             }
                             if(edge.getRelation().toString().equals("amod") || edge.getRelation().toString().equals("advmod")){
+                                if(stops.contains(edge.getTarget().lemma()))
+                                    continue;
+                                if(!edge.getTarget().toString().split("/")[1].startsWith("JJ"))
+                                    continue;
                                 Map<String,Integer> adjectives = noun.getAdjectives();
                                 adjectives.put(edge.getTarget().lemma(),adjectives.getOrDefault(edge.getTarget().lemma(), 0)+1);
                                 noun.setAdjectives(adjectives);
@@ -404,6 +422,10 @@ public class POSTagger {
 
                             if(edge.getRelation().toString().equals("nn") || edge.getRelation().toString().equals("npadvmod")
                                     || edge.getRelation().toString().equals("nsubj")){
+                                if(stops.contains(edge.getTarget().lemma()))
+                                    continue;
+                                if(!edge.getTarget().toString().split("/")[1].startsWith("JJ"))
+                                    continue;
                                 Map<String,Integer> adjectives = noun.getAdjectives();
                                 adjectives.put(edge.getTarget().lemma(),adjectives.getOrDefault(edge.getTarget().lemma(), 0)+1);
                                 noun.setAdjectives(adjectives);
@@ -459,7 +481,7 @@ public class POSTagger {
                             Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)));
         }
 
-        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("outRaw.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(output), StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
 
             for(Noun noun : nouns){
                 Map<String,Integer> compounds = noun.getCompounds();
@@ -492,7 +514,8 @@ public class POSTagger {
 
     public static void main(String[] args) throws IOException {
 //        new POSTagger().process2();
-        new POSTagger().deneme();
+        new POSTagger().deneme("Reviews_short_short.xlsx","Raw","outRaw.txt");
+        new POSTagger().deneme("Reviews.xlsx","Text","outText.txt");
     }
 
     private class Noun{
