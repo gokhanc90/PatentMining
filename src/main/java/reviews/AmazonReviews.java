@@ -1,5 +1,8 @@
 package reviews;
 
+import edu.stanford.nlp.pipeline.CoreDocument;
+import edu.stanford.nlp.pipeline.CoreSentence;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -20,6 +23,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -34,6 +38,7 @@ public class AmazonReviews {
         XSSFWorkbook workbook = new XSSFWorkbook();
         XSSFSheet sheet = workbook.createSheet("Text");
         XSSFSheet sheet2 = workbook.createSheet("Raw");
+        XSSFSheet sheet3 = workbook.createSheet("Sentence");
 
 
         Analyzer STEMMER = KStemmer; // Change with specified stemmer
@@ -47,6 +52,16 @@ public class AmazonReviews {
         xmlFile.println("<searchresult>");
 
         int excelRow=0;
+        int excelSentenceRow=0;
+
+        Properties props;
+        StanfordCoreNLP pipeline;
+        props = new Properties();
+        props.setProperty("annotators", "tokenize,ssplit");
+        props.setProperty("coref.algorithm", "neural");
+        pipeline = new StanfordCoreNLP(props);
+
+
         for(Map.Entry<String,Integer> e: linkPageCount.entrySet()) {
             String baseUrl=e.getKey();
             for(int i=1; i<=e.getValue();i++) {
@@ -74,9 +89,18 @@ public class AmazonReviews {
                     xmlFile.println("</document>");
 
                     sheet.createRow(excelRow).createCell(0).setCellValue(ptitle+" "+pbody);
-                    sheet2.createRow(excelRow).createCell(0).setCellValue(title);
-                    sheet2.createRow(excelRow++).createCell(1).setCellValue(body);
+                    sheet2.createRow(excelRow++).createCell(0).setCellValue(title + " " + body);
 
+                    if(!title.endsWith("."))
+                        title=title+".";
+
+
+                    CoreDocument document = new CoreDocument(title + " " + body);
+                    pipeline.annotate(document);
+                    for(CoreSentence sentence : document.sentences()) {
+                        sheet3.createRow(excelSentenceRow++).createCell(0).setCellValue(preprocess(sentence.text(),STEMMER));
+                    }
+                    excelSentenceRow++;
                 }
             }
         }

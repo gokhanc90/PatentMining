@@ -119,7 +119,7 @@ public class Wordnet {
         HashMap<String,Integer> tokensAndFreqs = new HashMap<>();
              while (iterator.hasNext()) {
                 Row currentRow = iterator.next();
-                String text = currentRow.getCell(1).getStringCellValue();
+                String text = currentRow.getCell(0).getStringCellValue();
                 if (StringUtils.isNullOrEmpty(text)) continue;
 
                 CoreDocument document = new CoreDocument(text);
@@ -139,7 +139,7 @@ public class Wordnet {
         try (BufferedWriter bw = Files.newBufferedWriter(Paths.get("wordnet.txt"), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
             while (iterator.hasNext()) {
                 Row currentRow = iterator.next();
-                String text = currentRow.getCell(1).getStringCellValue();
+                String text = currentRow.getCell(0).getStringCellValue();
                 if (StringUtils.isNullOrEmpty(text)) continue;
 
                 CoreDocument document = new CoreDocument(text);
@@ -215,6 +215,6 @@ public class Wordnet {
 
 
     public static void main(String[] args) throws IOException, ParseException {
-        new Wordnet().process2();
+        new Wordnet().process();
     }
 }

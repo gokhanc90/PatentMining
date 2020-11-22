@@ -11,6 +11,7 @@ import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.util.StringUtils;
+import org.apache.commons.text.similarity.CosineDistance;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -27,6 +28,10 @@ public class POSTagger {
     Properties props;
     StanfordCoreNLP pipeline;
     public POSTagger() {
+//        NLPinit();
+    }
+
+    private void NLPinit(){
         props = new Properties();
         // set the list of annotators to run
         props.setProperty("annotators", "tokenize,ssplit,pos,lemma,ner,parse,depparse,coref");
@@ -511,11 +516,66 @@ public class POSTagger {
         }
     }
 
+    private void similarityDeneme() throws IOException {
+
+        Map<String,Double> sims = new HashMap<>();
+        Map<String,String> raws = new HashMap<>();
+        List<String> rawsSorted = new ArrayList<>();
+        String str = "stop battery brush month constant stuck random red original sudden eufy wet quiet go";
+        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
+        XSSFSheet sheet = workbook.getSheet("Text");
+        Iterator<Row> iterator = sheet.iterator();
+        int rowno=0;
+        while (iterator.hasNext()) {
+            Row currentRow = iterator.next();
+            String text = currentRow.getCell(0).getStringCellValue();
+            if (StringUtils.isNullOrEmpty(text)) continue;
+            text = text.replaceAll("[^a-zA-Z0-9.' ]", "").toLowerCase();
+            text = text.replaceAll("ı", "i").toLowerCase();
+            double score = cosSim(str,text);
+            sims.put(++rowno + " - " + text,score);
+        }
+
+        XSSFSheet sheet2 = workbook.getSheet("Raw");
+        Iterator<Row> iterator2 = sheet2.iterator();
+        rowno=0;
+        while (iterator2.hasNext()) {
+            Row currentRow = iterator2.next();
+            String text = currentRow.getCell(0).getStringCellValue();
+            if (StringUtils.isNullOrEmpty(text)) continue;
+            raws.put(++rowno+"",text);
+        }
+
+        Map<String,Double> sorted =
+                sims.entrySet().stream()
+                        .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+        for(Map.Entry<String,Double> sortt : sorted.entrySet()){
+            String row = sortt.getKey().substring(0, sortt.getKey().indexOf("-")).trim();
+            rawsSorted.add(raws.get(row));
+        }
+
+        System.out.println("");
+    }
+
+    private double cosSim(String str1, String str2){
+        if(str1.length()==0 || str2.length()==0) return 0;
+        double score =0.0;
+        try{
+            score = 1-(new CosineDistance().apply(str1,str2));
+        }catch (IllegalArgumentException ex){
+        }
+        return score;
+    }
+
 
     public static void main(String[] args) throws IOException {
 //        new POSTagger().process2();
-        new POSTagger().deneme("Reviews_short_short.xlsx","Raw","outRaw.txt");
-        new POSTagger().deneme("Reviews.xlsx","Text","outText.txt");
+//        new POSTagger().deneme("Reviews_short_short.xlsx","Raw","outRaw.txt");
+//        new POSTagger().deneme("Reviews.xlsx","Text","outText.txt");
+        new POSTagger().similarityDeneme();
     }
 
     private class Noun{

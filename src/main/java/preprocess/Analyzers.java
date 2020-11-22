@@ -9,7 +9,6 @@ import org.apache.lucene.analysis.snowball.SnowballPorterFilterFactory;
 import org.apache.lucene.analysis.synonym.SynonymGraphFilterFactory;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
-import org.apache.lucene.analysis.tr.Zemberek3StemFilterFactory;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -78,7 +77,6 @@ public class Analyzers {
             return CustomAnalyzer.builder(Paths.get("./"))
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
-                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .addTokenFilter(SynonymGraphFilterFactory.class, "format", "wordnet", "expand", "true", "synonyms", "wn_s.pl")
                     .build();
         } catch (IOException ioe) {
@@ -122,20 +120,6 @@ public class Analyzers {
                     .addTokenFilter("lowercase")
                     .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .addTokenFilter(KStemFilterFactory.class)
-                    .build();
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-        }
-    }
-
-    public static Analyzer analyzerZemberek() {
-        try {
-            return CustomAnalyzer.builder(Paths.get(".\\"))
-                    .withTokenizer("standard")
-                    .addTokenFilter("apostrophe")
-                    .addTokenFilter("turkishlowercase")
-                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
-                    .addTokenFilter(Zemberek3StemFilterFactory.class, "strategy", "maxLength")
                     .build();
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
