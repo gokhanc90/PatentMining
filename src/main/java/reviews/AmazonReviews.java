@@ -36,20 +36,28 @@ public class AmazonReviews {
     public static void main(String[] args) throws IOException {
 
         XSSFWorkbook workbook = new XSSFWorkbook();
-        XSSFSheet sheet = workbook.createSheet("Text");
-        XSSFSheet sheet2 = workbook.createSheet("Raw");
-        XSSFSheet sheet3 = workbook.createSheet("Sentence");
+        XSSFSheet sheetRaw = workbook.createSheet("Raw");
+        XSSFSheet sheetRawSent = workbook.createSheet("RawSentence");
+        XSSFSheet sheetKStem = workbook.createSheet("KStemStopWordRemoval");
+        XSSFSheet sheetKStemSentence = workbook.createSheet("KStemSentenceStopWordRemoval");
+        XSSFSheet sheetPorter = workbook.createSheet("PorterStopWordRemoval");
+        XSSFSheet sheetPorterSentence = workbook.createSheet("PorterSentenceStopWordRemoval");
 
 
-        Analyzer STEMMER = KStemmer; // Change with specified stemmer
+        //Analyzer STEMMER = KStemmer; // Change with specified stemmer
 
 
         LinkedHashMap<String,Integer> linkPageCount = new LinkedHashMap<>();
         linkPageCount.put("https://www.amazon.com/product-reviews/B01LYCLS24/ref=cm_cr_arp_d_viewopt_sr?" +
                 "ie=UTF8&filterByStar=critical&reviewerType=all_reviews&pageNumber=CURRENTPAGENUMBER&formatType=all_formats#reviews-filter-bar",82);
 
-        PrintWriter xmlFile = new PrintWriter("ReviewsCarrot2.xml","UTF-8");
-        xmlFile.println("<searchresult>");
+        PrintWriter xmlFileKStem = new PrintWriter("ReviewsCarrot2KStem.xml","UTF-8");
+        PrintWriter xmlFilePorter = new PrintWriter("ReviewsCarrot2Porter.xml","UTF-8");
+        PrintWriter xmlFileNoStem = new PrintWriter("ReviewsCarrot2NoStem.xml","UTF-8");
+
+        xmlFileNoStem.println("<searchresult>");
+        xmlFileKStem.println("<searchresult>");
+        xmlFilePorter.println("<searchresult>");
 
         int excelRow=0;
         int excelSentenceRow=0;
@@ -72,24 +80,51 @@ public class AmazonReviews {
                 Elements reviews = cmReviewList.getElementsByAttributeValue("data-hook","review");
 
                 for (Element r : reviews) {
-                    xmlFile.println("<document>");
+                    xmlFileNoStem.println("<document>");
+                    xmlFileKStem.println("<document>");
+                    xmlFilePorter.println("<document>");
 
                     String title = r.getElementsByAttributeValue("data-hook","review-title").get(0).text();
-                    xmlFile.println("<title>");
-                    String ptitle = preprocess(title,STEMMER);
-                    xmlFile.println(ptitle);
-                    xmlFile.println("</title>");
+                    xmlFileNoStem.println("<title>");
+                    xmlFileKStem.println("<title>");
+                    xmlFilePorter.println("<title>");
+
+                    String pKStemtitle = preprocess(title,KStemmer);
+                    String pPortertitle = preprocess(title,PorterStemmer);
+                    String pRawtitle = preprocess(title,NoStem);
+
+                    xmlFileNoStem.println(pRawtitle);
+                    xmlFileKStem.println(pKStemtitle);
+                    xmlFilePorter.println(pPortertitle);
+
+                    xmlFileNoStem.println("</title>");
+                    xmlFileKStem.println("</title>");
+                    xmlFilePorter.println("</title>");
 
                     String body = r.getElementsByAttributeValue("data-hook","review-body").get(0).text();
-                    xmlFile.println("<snippet>");
-                    String pbody = preprocess(body,STEMMER);
-                    xmlFile.println(pbody);
-                    xmlFile.println("</snippet>");
+                    xmlFileNoStem.println("<snippet>");
+                    xmlFileKStem.println("<snippet>");
+                    xmlFilePorter.println("<snippet>");
 
-                    xmlFile.println("</document>");
+                    String pbodyRaw = preprocess(body,NoStem);
+                    String pbodyKStem = preprocess(body,KStemmer);
+                    String pbodyPorter = preprocess(body,PorterStemmer);
 
-                    sheet.createRow(excelRow).createCell(0).setCellValue(ptitle+" "+pbody);
-                    sheet2.createRow(excelRow++).createCell(0).setCellValue(title + " " + body);
+                    xmlFileNoStem.println(pbodyRaw);
+                    xmlFileKStem.println(pbodyKStem);
+                    xmlFilePorter.println(pbodyPorter);
+
+                    xmlFileNoStem.println("</snippet>");
+                    xmlFileKStem.println("</snippet>");
+                    xmlFilePorter.println("</snippet>");
+
+                    xmlFileNoStem.println("</document>");
+                    xmlFileKStem.println("</document>");
+                    xmlFilePorter.println("</document>");
+
+                    sheetRaw.createRow(excelRow).createCell(0).setCellValue(pRawtitle+" "+pbodyRaw);
+                    sheetKStem.createRow(excelRow).createCell(0).setCellValue(pKStemtitle + " " + pbodyKStem);
+                    sheetPorter.createRow(excelRow++).createCell(0).setCellValue(pPortertitle + " " + pbodyPorter);
 
                     if(!title.endsWith("."))
                         title=title+".";
@@ -98,14 +133,21 @@ public class AmazonReviews {
                     CoreDocument document = new CoreDocument(title + " " + body);
                     pipeline.annotate(document);
                     for(CoreSentence sentence : document.sentences()) {
-                        sheet3.createRow(excelSentenceRow++).createCell(0).setCellValue(preprocess(sentence.text(),STEMMER));
+                        sheetRawSent.createRow(excelSentenceRow).createCell(0).setCellValue(preprocess(sentence.text(),NoStem));
+                        sheetKStemSentence.createRow(excelSentenceRow).createCell(0).setCellValue(preprocess(sentence.text(),KStemmer));
+                        sheetPorterSentence.createRow(excelSentenceRow++).createCell(0).setCellValue(preprocess(sentence.text(),PorterStemmer));
                     }
                     excelSentenceRow++;
                 }
             }
         }
-        xmlFile.println("</searchresult>");
-        xmlFile.close();
+        xmlFileNoStem.println("</searchresult>");
+        xmlFileKStem.println("</searchresult>");
+        xmlFilePorter.println("</searchresult>");
+
+        xmlFileNoStem.close();
+        xmlFileKStem.close();
+        xmlFilePorter.close();
 
         FileOutputStream out = new FileOutputStream(new File("Reviews.xlsx"));
         workbook.write(out);

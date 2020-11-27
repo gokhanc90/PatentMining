@@ -65,7 +65,7 @@ public class Analyzers {
             return CustomAnalyzer.builder(Paths.get(".\\"))
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
-                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+//                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .build();
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
