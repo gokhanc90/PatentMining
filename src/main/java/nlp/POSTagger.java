@@ -1,5 +1,8 @@
 package nlp;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.TreeMultiset;
 import edu.stanford.nlp.coref.data.CorefChain;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.neural.rnn.RNNCoreAnnotations;
@@ -516,48 +519,95 @@ public class POSTagger {
         }
     }
 
-    private void similarityDeneme() throws IOException {
+    private void similarityDeneme(String inputFile, String reviewsFile) throws IOException {
 
-        Map<String,Double> sims = new HashMap<>();
-        Map<String,String> raws = new HashMap<>();
-        List<String> rawsSorted = new ArrayList<>();
-        String str = "stop battery brush month constant stuck random red original sudden eufy wet quiet go";
-        XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File("Reviews.xlsx")));
-        XSSFSheet sheet = workbook.getSheet("Text");
-        Iterator<Row> iterator = sheet.iterator();
-        int rowno=0;
-        while (iterator.hasNext()) {
-            Row currentRow = iterator.next();
-            String text = currentRow.getCell(0).getStringCellValue();
-            if (StringUtils.isNullOrEmpty(text)) continue;
-            text = text.replaceAll("[^a-zA-Z0-9.' ]", "").toLowerCase();
-            text = text.replaceAll("ı", "i").toLowerCase();
-            double score = cosSim(str,text);
-            sims.put(++rowno + " - " + text,score);
+        Map<String,String> termKeyword = new LinkedHashMap<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
+            String term = "";
+            String line;
+            boolean change = false;
+            String keywords = "";
+            while ((line = br.readLine()) != null) {
+                if(StringUtils.isNullOrEmpty(line)){
+                    change = false;
+                    termKeyword.put(term,keywords.trim());
+                    term="";
+                    keywords="";
+                    continue;
+                }
+                if(line.startsWith("*********************")){
+                    change = false;
+                    term = line.split("\\s+")[1];
+                    continue;
+                }
+                if(line.startsWith("*********** Compunds of") || line.startsWith("*********** Adjectives of") || line.startsWith("*********** Verbs of")){
+                    change=true;
+                    continue;
+                }
+                if(change){
+                    String[] tokens = line.split("\\)");
+                    for(String token : tokens){
+                        token=token.trim();
+                        if(token.length()==0) continue;
+                        keywords += token.substring(0,token.indexOf("(")) + " ";
+                    }
+                }
+
+
+            }
+        }catch (Exception ex){
+            ex.printStackTrace();
         }
 
-        XSSFSheet sheet2 = workbook.getSheet("Raw");
-        Iterator<Row> iterator2 = sheet2.iterator();
-        rowno=0;
-        while (iterator2.hasNext()) {
-            Row currentRow = iterator2.next();
-            String text = currentRow.getCell(0).getStringCellValue();
-            if (StringUtils.isNullOrEmpty(text)) continue;
-            raws.put(++rowno+"",text);
+        for(Map.Entry<String,String> termK : termKeyword.entrySet()) {
+
+            Map<String, Double> sims = new LinkedHashMap<>();
+            Map<String, String> raws = new LinkedHashMap<>();
+            Map<String,Double> rawsSorted = new LinkedHashMap<>();
+            String str = termK.getValue();
+            XSSFWorkbook workbook = new XSSFWorkbook(new FileInputStream(new File(reviewsFile)));
+            XSSFSheet sheet = workbook.getSheet("KStemSentenceStopWordRemoval");
+            Iterator<Row> iterator = sheet.iterator();
+            int rowno = 0;
+            while (iterator.hasNext()) {
+                Row currentRow = iterator.next();
+                String text = currentRow.getCell(0).getStringCellValue();
+                text = text.replaceAll("[^a-zA-Z0-9.' ]", "").toLowerCase();
+                text = text.replaceAll("ı", "i").toLowerCase();
+                double score = cosSim(str, text);
+                sims.put(rowno + " - " + text, score);
+                rowno++;
+            }
+
+            XSSFSheet sheet2 = workbook.getSheet("RawSentence");
+            Iterator<Row> iterator2 = sheet2.iterator();
+            rowno = 0;
+            while (iterator2.hasNext()) {
+                Row currentRow = iterator2.next();
+                String text = currentRow.getCell(0).getStringCellValue();
+                raws.put(rowno + "", text);
+                rowno++;
+            }
+
+            Map<String, Double> sorted =
+                    sims.entrySet().stream()
+                            .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+            for (Map.Entry<String, Double> sortt : sorted.entrySet()) {
+                String row = sortt.getKey().substring(0, sortt.getKey().indexOf("-")).trim();
+                rawsSorted.put(raws.get(row),sortt.getValue());
+            }
+
+            System.out.println("********* " + termK.getKey() + " *********");
+            rawsSorted.entrySet()
+                    .stream()
+                    .limit(3)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                            (v1,v2) -> v1, LinkedHashMap::new))
+                    .forEach((k,v)->System.out.println(String. format("%.2f",v) + " - " + k));
         }
-
-        Map<String,Double> sorted =
-                sims.entrySet().stream()
-                        .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
-
-        for(Map.Entry<String,Double> sortt : sorted.entrySet()){
-            String row = sortt.getKey().substring(0, sortt.getKey().indexOf("-")).trim();
-            rawsSorted.add(raws.get(row));
-        }
-
-        System.out.println("");
     }
 
     private double cosSim(String str1, String str2){
@@ -570,12 +620,74 @@ public class POSTagger {
         return score;
     }
 
+    private void filterByMedian(String file){
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+
+
+            String term = "";
+
+            String line;
+            Set<Integer> freqs = new LinkedHashSet<>();
+            boolean change = false;
+            while ((line = br.readLine()) != null) {
+
+                if(StringUtils.isNullOrEmpty(line)){
+                    change = false;
+                    System.out.println(line);
+                    continue;
+                }
+                if(line.startsWith("*********************")){
+                    change = false;
+                    term = line.split("\\s+")[1];
+                    System.out.println(line);
+                    continue;
+                }
+
+                if(line.startsWith("*********** Compunds of") || line.startsWith("*********** Adjectives of") || line.startsWith("*********** Verbs of")){
+                    change=true;
+                    System.out.println(line);
+                    continue;
+                }
+
+                if(change){
+                    String newLine = "";
+                    freqs = new LinkedHashSet<>();
+                    line = line.replaceAll(" "+term,"");
+                    String[] tokens = line.split("\\)");
+                    for(String token : tokens){
+                        token=token.trim();
+                        if(token.length()==0) continue;
+                        freqs.add(Integer.parseInt(token.substring(token.indexOf("(")+1,token.length())));
+                    }
+
+
+                    int median = Iterables.get(freqs, (freqs.size() - 1) / 2);
+
+                    for(String token : tokens){
+                        token=token.trim();
+                        if(token.length()==0) continue;
+                        if(Integer.parseInt(token.substring(token.indexOf("(")+1,token.length()))>=median)
+                            newLine += token + ") ";
+                    }
+
+                    System.out.println(newLine);
+                }
+
+
+            }
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
+    }
+
 
     public static void main(String[] args) throws IOException {
 //        new POSTagger().process2();
 //        new POSTagger().deneme("Reviews_short_short.xlsx","Raw","outRaw.txt");
-//        new POSTagger().deneme("Reviews.xlsx","Text","outText.txt");
-        new POSTagger().similarityDeneme();
+//        new POSTagger().deneme("Reviews.xlsx","PorterStopWordRemoval","outPorterStopWordRemoval.txt");
+        new POSTagger().similarityDeneme("G:\\Google Drive\\patent madenciliği\\Patent Mining Files\\outKStemStopWordRemovalByTopics_Filtered.txt", "Reviews.xlsx");
+
+//        new POSTagger().filterByMedian("G:\\Google Drive\\patent madenciliği\\Patent Mining Files\\outPorterStopWordRemovalByTopics_Filtered.txt");
     }
 
     private class Noun{
