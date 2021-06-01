@@ -603,7 +603,7 @@ public class POSTagger {
             System.out.println("********* " + termK.getKey() + " *********");
             rawsSorted.entrySet()
                     .stream()
-                    .limit(3)
+                    .limit(20)
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
                             (v1,v2) -> v1, LinkedHashMap::new))
                     .forEach((k,v)->System.out.println(String. format("%.2f",v) + " - " + k));
@@ -685,7 +685,7 @@ public class POSTagger {
 //        new POSTagger().process2();
 //        new POSTagger().deneme("Reviews_short_short.xlsx","Raw","outRaw.txt");
 //        new POSTagger().deneme("Reviews.xlsx","PorterStopWordRemoval","outPorterStopWordRemoval.txt");
-        new POSTagger().similarityDeneme("G:\\Google Drive\\patent madenciliği\\Patent Mining Files\\outKStemStopWordRemovalByTopics_Filtered.txt", "Reviews.xlsx");
+        new POSTagger().similarityDeneme("outKStemStopWordRemovalByTopics_Filtered.txt", "Reviews.xlsx");
 
 //        new POSTagger().filterByMedian("G:\\Google Drive\\patent madenciliği\\Patent Mining Files\\outPorterStopWordRemovalByTopics_Filtered.txt");
     }

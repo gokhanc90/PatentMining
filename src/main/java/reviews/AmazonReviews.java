@@ -9,6 +9,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jsoup.Jsoup;
+import org.jsoup.helper.HttpConnection;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -48,8 +49,11 @@ public class AmazonReviews {
 
 
         LinkedHashMap<String,Integer> linkPageCount = new LinkedHashMap<>();
-        linkPageCount.put("https://www.amazon.com/product-reviews/B01LYCLS24/ref=cm_cr_arp_d_viewopt_sr?" +
-                "ie=UTF8&filterByStar=critical&reviewerType=all_reviews&pageNumber=CURRENTPAGENUMBER&formatType=all_formats#reviews-filter-bar",82);
+//        linkPageCount.put("https://www.amazon.com/product-reviews/B01LYCLS24/ref=cm_cr_arp_d_viewopt_sr?" +
+//                "ie=UTF8&filterByStar=critical&reviewerType=all_reviews&pageNumber=CURRENTPAGENUMBER&formatType=all_formats#reviews-filter-bar",82);
+
+        linkPageCount.put("https://www.amazon.com/product-reviews/B08J5R3K3Q/ref=cm_cr_getr_d_paging_btm_next_2" +
+                "?ie=UTF8&filterByStar=all_stars&reviewerType=all_reviews&pageNumber=CURRENTPAGENUMBER#reviews-filter-bar",214);
 
         PrintWriter xmlFileKStem = new PrintWriter("ReviewsCarrot2KStem.xml","UTF-8");
         PrintWriter xmlFilePorter = new PrintWriter("ReviewsCarrot2Porter.xml","UTF-8");
@@ -75,8 +79,9 @@ public class AmazonReviews {
             for(int i=1; i<=e.getValue();i++) {
                 String url = baseUrl.replace("CURRENTPAGENUMBER",String.valueOf(i));
 
-                Document doc = Jsoup.connect(url).get();
-                Element cmReviewList = doc.getElementById("cm_cr-review_list");
+                Document doc = Jsoup.connect(url).userAgent("Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0").get();
+                Element bodyH = doc.body();
+                Element cmReviewList = bodyH.getElementById("a-page");
                 Elements reviews = cmReviewList.getElementsByAttributeValue("data-hook","review");
 
                 for (Element r : reviews) {
@@ -118,13 +123,27 @@ public class AmazonReviews {
                     xmlFileKStem.println("</snippet>");
                     xmlFilePorter.println("</snippet>");
 
+
+
+                    String star = r.getElementsByAttributeValue("data-hook","review-star-rating").get(0).text();
+
+
+
                     xmlFileNoStem.println("</document>");
                     xmlFileKStem.println("</document>");
                     xmlFilePorter.println("</document>");
 
-                    sheetRaw.createRow(excelRow).createCell(0).setCellValue(pRawtitle+" "+pbodyRaw);
-                    sheetKStem.createRow(excelRow).createCell(0).setCellValue(pKStemtitle + " " + pbodyKStem);
-                    sheetPorter.createRow(excelRow++).createCell(0).setCellValue(pPortertitle + " " + pbodyPorter);
+                    sheetRaw.createRow(excelRow).createCell(0).setCellValue(star);
+                    sheetRaw.getRow(excelRow).createCell(1).setCellValue(pRawtitle);
+                    sheetRaw.getRow(excelRow).createCell(2).setCellValue(pbodyRaw);
+
+                    sheetKStem.createRow(excelRow).createCell(0).setCellValue(star);
+                    sheetRaw.getRow(excelRow).createCell(1).setCellValue(pKStemtitle);
+                    sheetRaw.getRow(excelRow).createCell(2).setCellValue(pbodyKStem);
+
+                    sheetPorter.createRow(excelRow++).createCell(0).setCellValue(star);
+                    sheetRaw.getRow(excelRow).createCell(1).setCellValue(pPortertitle);
+                    sheetRaw.getRow(excelRow).createCell(2).setCellValue(pbodyPorter);
 
                     if(!title.endsWith("."))
                         title=title+".";

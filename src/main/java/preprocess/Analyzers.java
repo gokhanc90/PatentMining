@@ -62,7 +62,7 @@ public class Analyzers {
 
     public static Analyzer analyzerDefault() {
         try {
-            return CustomAnalyzer.builder(Paths.get(".\\"))
+            return CustomAnalyzer.builder(Paths.get("./"))
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
 //                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
@@ -86,7 +86,7 @@ public class Analyzers {
 
     public static Analyzer analyzerPorter() {
         try {
-            return CustomAnalyzer.builder(Paths.get(".\\"))
+            return CustomAnalyzer.builder(Paths.get("./"))
                     .withTokenizer("standard")
                     .addTokenFilter("apostrophe")
                     .addTokenFilter("turkishlowercase")
@@ -101,10 +101,10 @@ public class Analyzers {
 
     public static Analyzer analyzerPorterEng() {
         try {
-            return CustomAnalyzer.builder(Paths.get(".\\"))
+            return CustomAnalyzer.builder(Paths.get("./"))
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
-                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+//                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .addTokenFilter(SnowballPorterFilterFactory.class)
                     .build();
         } catch (IOException ioe) {
@@ -115,10 +115,10 @@ public class Analyzers {
 
     public static Analyzer analyzerKStem() {
         try {
-            return CustomAnalyzer.builder(Paths.get(".\\"))
+            return CustomAnalyzer.builder(Paths.get("./"))
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
-                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+//                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .addTokenFilter(KStemFilterFactory.class)
                     .build();
         } catch (IOException ioe) {
