@@ -71,6 +71,17 @@ public class Analyzers {
             throw new RuntimeException(ioe);
         }
     }
+    public static Analyzer analyzerDefaultWithStopWordRemoval() {
+        try {
+            return CustomAnalyzer.builder(Paths.get("./"))
+                    .withTokenizer("standard")
+                    .addTokenFilter("lowercase")
+                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+                    .build();
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
 
     public static Analyzer analyzerDefaultWordNet() {
         try {
@@ -105,6 +116,18 @@ public class Analyzers {
                     .withTokenizer("standard")
                     .addTokenFilter("lowercase")
 //                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
+                    .addTokenFilter(SnowballPorterFilterFactory.class)
+                    .build();
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
+    public static Analyzer analyzerPorterEngWithStopwordRemoval() {
+        try {
+            return CustomAnalyzer.builder(Paths.get("./"))
+                    .withTokenizer("standard")
+                    .addTokenFilter("lowercase")
+                    .addTokenFilter("stop", "ignoreCase", "false", "words", "stopwords.txt", "format", "wordset")
                     .addTokenFilter(SnowballPorterFilterFactory.class)
                     .build();
         } catch (IOException ioe) {

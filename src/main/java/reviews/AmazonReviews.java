@@ -141,9 +141,9 @@ public class AmazonReviews {
                     sheetRaw.getRow(excelRow).createCell(1).setCellValue(pKStemtitle);
                     sheetRaw.getRow(excelRow).createCell(2).setCellValue(pbodyKStem);
 
-                    sheetPorter.createRow(excelRow++).createCell(0).setCellValue(star);
+                    sheetPorter.createRow(excelRow).createCell(0).setCellValue(star);
                     sheetRaw.getRow(excelRow).createCell(1).setCellValue(pPortertitle);
-                    sheetRaw.getRow(excelRow).createCell(2).setCellValue(pbodyPorter);
+                    sheetRaw.getRow(excelRow++).createCell(2).setCellValue(pbodyPorter);
 
                     if(!title.endsWith("."))
                         title=title+".";

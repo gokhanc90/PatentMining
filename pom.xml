@@ -62,6 +62,16 @@
     </build>
 
     <dependencies>
+
+        <dependency>
+            <groupId>jLDADMM</groupId>
+            <artifactId>jLDADMM</artifactId>
+            <version>1.0</version>
+            <type>jar</type>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/jLDADMM.jar</systemPath>
+        </dependency>
+
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
